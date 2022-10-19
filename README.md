@@ -1,6 +1,6 @@
-# :diamond: Coal
-Another mineral themed experimental language. We hope this to be the good one :sparkles:.
----
+# 💎 Coal
+Another mineral themed experimental language. 
+We hope this one is the good one ✨.
 
-# :construction: Under contruction
-Please, bear with us. This will soon be filled with useful info.
+## 🚧 Under construction
+Please, bear **(🐻)** with us. This will soon be filled with *useful* info.
