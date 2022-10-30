@@ -24,6 +24,6 @@ typedef double f64;
 
 /* Boolean */
 
-typedef int8_t bool;
+typedef i8 bool;
 
 #endif /* #ifndef _NAT_TYPES_H_ */

@@ -20,7 +20,7 @@ typedef union CoalVMFlags {
     Word carry    : 1; /* CF */
     Word sign     : 1; /* SF */
     Word overflow : 1; /* OF */
-    Word pair     : 1; /* PF */
+    Word pairity  : 1; /* PF */
     Word nan      : 1; /* NF */
     Word infinity : 1; /* IF */
 
@@ -63,7 +63,7 @@ typedef union CoalVMFlags {
   Distribution of RAM and VM Pointers
   
   +---------------+ <- Global Var Frame (Absolute)
-  |               |    (always zero)
+  |               |    (always zero, no pointer)
   |   2. Global   |
   |      Var      | <- GLV addr (Relative)
   |               |
@@ -71,16 +71,18 @@ typedef union CoalVMFlags {
   |               | 
   |  1. Program   | <- Program Counter (Relative)
   |               |
-  +---------------+ <- Stack Frame (Absolute)
-  |               |
-  |   3. Stack    | <- Stack pointer (Relative)
-  |               |
   +---------------+ <- Heap Frame (Absolute)
   |               |
-  |   4. Heap     | <- Heap addr (Relative)
+  |   3. Heap     | <- Heap addr (Relative)
   |               |
-  +---------------+
-
+  :               :
+  :    .......    : <- Stack and heap eventually meet 
+  :               :    around here (let's hope not)
+  |               |
+  |   4. Stack    | <- Stack pointer (Relative)
+  |               |
+  +---------------+ <- Stack Frame (Absolute) 
+                       (always RAM size, no pointer)
 */
 
 #define RAM_SIZE 0x80000U
@@ -90,9 +92,9 @@ typedef struct CoalVM {
   /* Registers */
 
   Word ra; /* Accumulator */
-  Word rb; /* Gral. Purpose */
-  Word rc; /* Gral. Purpose */
-  Word rd; /* Address */
+  Word rx; /* Gral. Purpose */
+  Word ry; /* Gral. Purpose */
+  Word rz; /* Gral. Purpose */
 
   /* Absolute ptrs */
   
@@ -104,7 +106,7 @@ typedef struct CoalVM {
 
   Word pc; /* Program counter */
   Word sp; /* Stack pointer */
-  Word ff; /* Function Frame */
+  Word bp; /* Base pointer */
   
   /* Current Inst */
 
@@ -146,7 +148,7 @@ Word _stack_peek (CoalVM * vm);
 
 /* Init */
 
-bool CoalVM_init (CoalVM * vm, Word p_frame, Word p_len, Word p_start);
+Bool CoalVM_init (CoalVM * vm, Word p_frame, Word p_len, Word p_start);
 
 /* Run */
 

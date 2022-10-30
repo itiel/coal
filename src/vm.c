@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
 #include "./vm.h"
 #include "./vm-inst.h"
@@ -39,31 +40,23 @@ Byte _ram_read_byte (CoalVM * vm, Word addr) {
 }
 
 void _ram_write_word (CoalVM * vm, Word addr, Word val) {
-  if ((addr + Word_SIZE) > sizeof(vm->ram)) {
+  if ((addr + sizeof(Word)) > sizeof(vm->ram)) {
     vm->flags.accessviolation = TRUE;
     vm->flags.running = FALSE;
     return;
   }
 
-  vm->ram[addr]     = (Byte) ((val & ((Word) 0xFF000000U)) >> 24);
-  vm->ram[addr + 1] = (Byte) ((val & ((Word) 0xFF0000U)) >> 16);
-  vm->ram[addr + 2] = (Byte) ((val & ((Word) 0xFF00U)) >> 8);
-  vm->ram[addr + 3] = (Byte)  (val & ((Word) 0xFFU));
+  *((Word *) &(vm->ram[addr])) = htonl(val);
 }
 
 Word _ram_read_word (CoalVM * vm, Word addr) { 
-  if ((addr + Word_SIZE) > sizeof(vm->ram)) {
+  if ((addr + sizeof(Word)) > sizeof(vm->ram)) {
     vm->flags.accessviolation = TRUE;
     vm->flags.running = FALSE;
     return 0;
   }
 
-  return ( 
-      (((Word) vm->ram[addr])     << 24 )
-    | (((Word) vm->ram[addr + 1]) << 16 )
-    | (((Word) vm->ram[addr + 2]) << 8 )
-    |  ((Word) vm->ram[addr + 3])
-  );
+  return ntohl(*((Word *) &(vm->ram[addr])));
 }
 
 /* Program Fetch */
@@ -71,9 +64,9 @@ Word _ram_read_word (CoalVM * vm, Word addr) {
 Word _prog_fetch (CoalVM * vm) {
   Word addr, val;
 
-  addr = vm->pf + (vm->pc * Word_SIZE);
+  addr = vm->pf + (vm->pc * sizeof(Word));
 
-  if ((addr + Word_SIZE) > vm->sf) {
+  if ((addr + sizeof(Word)) > vm->sf) {
     vm->flags.accessviolation = TRUE;
     vm->flags.stackoverflow = TRUE;
     vm->flags.running = FALSE;
@@ -95,9 +88,9 @@ Word _prog_fetch (CoalVM * vm) {
 Word _stack_read (CoalVM * vm, Word s_addr) {
   Word abs_addr, val;
 
-  abs_addr = vm->sf + (s_addr * Word_SIZE); 
+  abs_addr = vm->sf + (s_addr * sizeof(Word)); 
 
-  if ((abs_addr + Word_SIZE) > vm->hf) {
+  if ((abs_addr + sizeof(Word)) > vm->hf) {
     vm->flags.accessviolation = TRUE;
     vm->flags.stackoverflow = TRUE;
     vm->flags.running = FALSE;
@@ -114,9 +107,9 @@ Word _stack_read (CoalVM * vm, Word s_addr) {
 
 void _stack_write (CoalVM * vm, Word s_addr, Word val) {
   Word abs_addr;
-  abs_addr = vm->sf + (s_addr * Word_SIZE); 
+  abs_addr = vm->sf + (s_addr * sizeof(Word)); 
 
-  if ((abs_addr + Word_SIZE) > vm->hf) {
+  if ((abs_addr + sizeof(Word)) > vm->hf) {
     vm->flags.accessviolation = TRUE;
     vm->flags.stackoverflow = TRUE;
     vm->flags.running = FALSE;
@@ -124,9 +117,6 @@ void _stack_write (CoalVM * vm, Word s_addr, Word val) {
   }
 
   _ram_write_word(vm, abs_addr, val);
-
-  if (!vm->flags.running) 
-    return;
 }
 
 Word _stack_pop (CoalVM * vm) {
@@ -191,9 +181,9 @@ HandleDecl(_capi_WRITE_handle) {
     ramcount, buffcount;
   Byte buff[CAPIBUFFSIZE], b;
 
-  fldesc = vm->rb;
-  base = vm->rc;
-  len = vm->rd;
+  fldesc = vm->rx;
+  base = vm->ry;
+  len = vm->rz;
 
   if (!len) 
     return;
@@ -260,37 +250,37 @@ HandleDecl(_fetch_handle) {
 
 /* Init */
 
-bool CoalVM_init (CoalVM * vm, Word p_frame, Word p_len, Word p_start) {
+Bool CoalVM_init (CoalVM * vm, Word p_frame, Word p_len, Word p_start) {
   Word rem, pf, sf, hf, pc;
 
   /* Program Frame */
   
   pf = p_frame;
 
-  // if ((rem = pf % Word_SIZE))
-  //   pf += Word_SIZE - rem;
+  // if ((rem = pf % sizeof(Word)))
+  //   pf += sizeof(Word) - rem;
 
-  // if ((pf + Word_SIZE) > sizeof(vm->ram)) 
+  // if ((pf + sizeof(Word)) > sizeof(vm->ram)) 
   //   return FALSE;
   
   /* Stack Frame */
 
-  sf = pf + (p_len * Word_SIZE);
+  sf = pf + (p_len * sizeof(Word));
 
-  if ((rem = sf % Word_SIZE))
-    sf += Word_SIZE - rem;
+  if ((rem = sf % sizeof(Word)))
+    sf += sizeof(Word) - rem;
 
-  if ((sf + Word_SIZE) > sizeof(vm->ram)) 
+  if ((sf + sizeof(Word)) > sizeof(vm->ram)) 
     return FALSE;
 
   /* Heap Frame */
   
   hf = sf + ((sizeof(vm->ram) - sf) >> 1);
 
-  if ((rem = hf % Word_SIZE))
-    hf += Word_SIZE - rem;
+  if ((rem = hf % sizeof(Word)))
+    hf += sizeof(Word) - rem;
 
-  if ((hf + (Word_SIZE * 8)) > sizeof(vm->ram)) 
+  if ((hf + (sizeof(Word) * 8)) > sizeof(vm->ram)) 
     return FALSE;
   
   /* Program counter */
@@ -308,7 +298,7 @@ bool CoalVM_init (CoalVM * vm, Word p_frame, Word p_len, Word p_start) {
 
   vm->pc = pc; 
   vm->sp = 0x0;
-  vm->ff = 0x0;
+  vm->bp = 0x0;
   
   vm->inst = INST_NOOP; 
 
@@ -361,26 +351,24 @@ HandleDecl(CoalVM_stats) {
   printf("\n-- VM Stats --\n\n");
 
   _gut_reg(ra, vm->ra);
-  _gut_reg(rb, vm->rb);
-  _gut_reg(rc, vm->rc);
-  _gut_reg(rd, vm->rd);
+  _gut_reg(rx, vm->rx);
+  _gut_reg(ry, vm->ry);
+  _gut_reg(rz, vm->rz);
   _gut_reg(pf, vm->pf);
   _gut_reg(sf, vm->sf);
   _gut_reg(hf, vm->hf);
   _gut_reg(pc, vm->pc);
   _gut_reg(sp, vm->sp);
-  _gut_reg(ff, vm->ff);
+  _gut_reg(bp, vm->bp);
   _gut_reg(inst, vm->inst);
   _gut_reg(flags, vm->flags.all);
 
-  printf("IND FLAGS:\n");
-
   #define _ind_flag(f) \
     printf( \
-      "\t%s\t-> %s\n", \
-      #f, \
+      "\t%s -> %s\n", \
       vm->flags.f ? \
-        "1" : "0" \
+        "1" : "0", \
+      #f \
     )
 
   _ind_flag(running);

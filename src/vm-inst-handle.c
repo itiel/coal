@@ -1,9 +1,17 @@
 #include <math.h>
+#include <stdio.h>
 
 #include "./common.h"
 #include "./vm.h"
 #include "./vm-inst.h"
 #include "./vm-inst-handle.h"
+
+/* Util */
+
+#define LOW_HALF \
+  ((DWord) ~((Word) 0x0))
+#define HIGH_HALF \
+  ~LOW_HALF
 
 /* Inst Handles */
 
@@ -26,10 +34,6 @@ HandleDecl(_inst_PUSH_handle) {
   }
 
   _stack_push(vm, val);
-
-  if (!vm->flags.running) {
-    return;
-  }
 } 
 
 HandleDecl(_inst_DUPL_handle) {
@@ -41,67 +45,58 @@ HandleDecl(_inst_DUPL_handle) {
     return;
 
   _stack_push(vm, val);
-
-  if (!vm->flags.running)
-    return;
 } 
 
 HandleDecl(_inst_PUSHA_handle) { 
   _stack_push(vm, vm->ra);
-
-  if (!vm->flags.running)
-    return;
 }
 
-HandleDecl(_inst_PUSHB_handle) { 
-  _stack_push(vm, vm->rb);
-
-  if (!vm->flags.running)
-    return;
+HandleDecl(_inst_PUSHX_handle) { 
+  _stack_push(vm, vm->rx);
 }
 
-HandleDecl(_inst_PUSHC_handle) { 
-  _stack_push(vm, vm->rc);
-
-  if (!vm->flags.running)
-    return;
+HandleDecl(_inst_PUSHY_handle) { 
+  _stack_push(vm, vm->ry);
 }
 
-HandleDecl(_inst_PUSHD_handle) { 
-  _stack_push(vm, vm->rd);
-
-  if (!vm->flags.running)
-    return;
+HandleDecl(_inst_PUSHZ_handle) { 
+  _stack_push(vm, vm->rz);
 }
 
 HandleDecl(_inst_PUSHP_handle) { 
   _stack_push(vm, vm->pc);
-
-  if (!vm->flags.running)
-    return;
 }
 
 HandleDecl(_inst_PUSHS_handle) { 
   _stack_push(vm, vm->sp);
-
-  if (!vm->flags.running)
-    return;
 }
 
-HandleDecl(_inst_PUSHF_handle) { 
-  _stack_push(vm, vm->ff);
+HandleDecl(_inst_PUSHB_handle) { 
+  _stack_push(vm, vm->bp);
+}
+
+HandleDecl(_inst_PUSHL_handle) {
+  Word n, val;
+
+  n = _prog_fetch(vm);
 
   if (!vm->flags.running)
     return;
+
+  /* Check ? */
+
+  val = _stack_read(vm, vm->bp + n);
+
+  if (!vm->flags.running)
+    return;
+
+  _stack_push(vm, val);
 }
 
 /* Stack Popping */
 
 HandleDecl(_inst_POP_handle) {
   _stack_pop(vm);
-
-  if (!vm->flags.running)
-    return;
 } 
 
 HandleDecl(_inst_POPA_handle) {
@@ -115,7 +110,7 @@ HandleDecl(_inst_POPA_handle) {
   vm->ra = val;
 }
 
-HandleDecl(_inst_POPB_handle) {
+HandleDecl(_inst_POPX_handle) {
   Word val;
 
   val = _stack_pop(vm);
@@ -123,10 +118,10 @@ HandleDecl(_inst_POPB_handle) {
   if (!vm->flags.running)
     return;
 
-  vm->rb = val;
+  vm->rx = val;
 }
 
-HandleDecl(_inst_POPC_handle) {
+HandleDecl(_inst_POPY_handle) {
   Word val;
 
   val = _stack_pop(vm);
@@ -134,10 +129,10 @@ HandleDecl(_inst_POPC_handle) {
   if (!vm->flags.running)
     return;
 
-  vm->rc = val;
+  vm->ry = val;
 }
 
-HandleDecl(_inst_POPD_handle) { 
+HandleDecl(_inst_POPZ_handle) { 
   Word val;
 
   val = _stack_pop(vm);
@@ -145,7 +140,7 @@ HandleDecl(_inst_POPD_handle) {
   if (!vm->flags.running)
     return;
   
-  vm->rd = val;
+  vm->rz = val;
 }
 
 HandleDecl(_inst_POPP_handle) { 
@@ -170,7 +165,7 @@ HandleDecl(_inst_POPS_handle) {
   vm->sp = val;
 }
 
-HandleDecl(_inst_POPF_handle) { 
+HandleDecl(_inst_POPB_handle) { 
   Word val;
 
   val = _stack_pop(vm);
@@ -178,103 +173,23 @@ HandleDecl(_inst_POPF_handle) {
   if (!vm->flags.running)
     return;
 
-  vm->pf = val;
+  vm->bp = val;
 }
 
-/* Register Loading */
+HandleDecl(_inst_POPL_handle) { 
+  Word n, val;
 
-HandleDecl(_inst_LOADA_handle) {
-  Word val;
-
-  val = _prog_fetch(vm);
+  n = _prog_fetch(vm);
 
   if (!vm->flags.running)
     return;
 
-  vm->ra = val;
-}
-
-HandleDecl(_inst_LOADB_handle) {
-  Word val;
-
-  val = _prog_fetch(vm);
+  val = _stack_pop(vm);
 
   if (!vm->flags.running)
     return;
 
-  vm->rb = val;
-}
-
-HandleDecl(_inst_LOADC_handle) {
-  Word val;
-
-  val = _prog_fetch(vm);
-
-  if (!vm->flags.running)
-    return;
-
-  vm->rc = val;
-}
-
-HandleDecl(_inst_LOADD_handle) {
-  Word val;
-
-  val = _prog_fetch(vm);
-
-  if (!vm->flags.running)
-    return;
-
-  vm->rd = val;
-}
-
-/* Register Moving */
-
-HandleDecl(_inst_MOVAB_handle){
-  vm->rb = vm->ra;
-}
-
-HandleDecl(_inst_MOVAC_handle){
-  vm->rc = vm->ra;
-}
-
-HandleDecl(_inst_MOVAD_handle){
-  vm->rd = vm->ra;
-}
-
-HandleDecl(_inst_MOVBA_handle){
-  vm->ra = vm->rb;
-}
-
-HandleDecl(_inst_MOVBC_handle){
-  vm->rc = vm->rb;
-}
-
-HandleDecl(_inst_MOVBD_handle){
-  vm->rd = vm->rb;
-}
-
-HandleDecl(_inst_MOVCA_handle){
-  vm->ra = vm->rc;
-}
-
-HandleDecl(_inst_MOVCB_handle){
-  vm->rb = vm->rc;
-}
-
-HandleDecl(_inst_MOVCD_handle){
-  vm->rd = vm->rc;
-}
-
-HandleDecl(_inst_MOVDA_handle){
-  vm->ra = vm->rd;
-}
-
-HandleDecl(_inst_MOVDB_handle){
-  vm->rb = vm->rd;
-}
-
-HandleDecl(_inst_MOVDC_handle){
-  vm->rc = vm->rd;
+  _stack_write(vm, vm->bp + n, val);
 }
 
 /* Branching */
@@ -314,7 +229,14 @@ HandleDecl(_inst_JUMPNZ_handle) {
     vm->pc = addr;
 }
 
-HandleDecl(_inst_JUMPC_handle) {
+#define _equals(flags) \
+  (flags.zero && !flags.carry && !flags.sign)
+#define _below(flags) \
+  (!flags.zero && flags.carry && flags.sign)
+#define _above(flags) \
+  (!flags.zero && !flags.carry && !flags.sign)
+
+HandleDecl(_inst_JUMPE_handle) {
   Word addr;
 
   addr = _prog_fetch(vm);
@@ -322,11 +244,23 @@ HandleDecl(_inst_JUMPC_handle) {
   if (!vm->flags.running)
     return;
 
-  if (vm->flags.carry)
+  if (_equals(vm->flags))
+    vm->pc = addr; 
+}
+
+HandleDecl(_inst_JUMPNE_handle) {
+  Word addr;
+
+  addr = _prog_fetch(vm);
+
+  if (!vm->flags.running)
+    return;
+
+  if (!_equals(vm->flags))
     vm->pc = addr;
 }
 
-HandleDecl(_inst_JUMPNC_handle) {
+HandleDecl(_inst_JUMPB_handle) {
   Word addr;
 
   addr = _prog_fetch(vm);
@@ -334,11 +268,11 @@ HandleDecl(_inst_JUMPNC_handle) {
   if (!vm->flags.running)
     return;
 
-  if (!vm->flags.carry)
+  if (_below(vm->flags))
     vm->pc = addr;
 }
 
-HandleDecl(_inst_JUMPS_handle) {
+HandleDecl(_inst_JUMPNB_handle) {
   Word addr;
 
   addr = _prog_fetch(vm);
@@ -346,11 +280,11 @@ HandleDecl(_inst_JUMPS_handle) {
   if (!vm->flags.running)
     return;
 
-  if (vm->flags.sign)
+  if (!_below(vm->flags))
     vm->pc = addr;
 }
 
-HandleDecl(_inst_JUMPNS_handle) {
+HandleDecl(_inst_JUMPA_handle) {
   Word addr;
 
   addr = _prog_fetch(vm);
@@ -358,11 +292,11 @@ HandleDecl(_inst_JUMPNS_handle) {
   if (!vm->flags.running)
     return;
 
-  if (!vm->flags.sign)
+  if (_above(vm->flags))
     vm->pc = addr;
 }
 
-HandleDecl(_inst_JUMPO_handle) {
+HandleDecl(_inst_JUMPNA_handle) {
   Word addr;
 
   addr = _prog_fetch(vm);
@@ -370,293 +304,181 @@ HandleDecl(_inst_JUMPO_handle) {
   if (!vm->flags.running)
     return;
 
-  if (vm->flags.overflow)
+  if (!_above(vm->flags))
     vm->pc = addr;
 }
 
-HandleDecl(_inst_JUMPNO_handle) {
+HandleDecl(_inst_JUMPEB_handle) {
   Word addr;
 
-  addr = _prog_fetch(vm);
+  addr = _prog_fetch(vm);  
 
   if (!vm->flags.running)
     return;
 
-  if (!vm->flags.overflow)
+  if (_equals(vm->flags) || _below(vm->flags))
+    vm->pc = addr;
+}
+
+HandleDecl(_inst_JUMPNEB_handle) {
+  Word addr;
+
+  addr = _prog_fetch(vm);  
+
+  if (!vm->flags.running)
+    return;
+
+  if (!(_equals(vm->flags) || _below(vm->flags)))
+    vm->pc = addr;
+}
+
+HandleDecl(_inst_JUMPEA_handle) {
+  Word addr;
+
+  addr = _prog_fetch(vm);  
+
+  if (!vm->flags.running)
+    return;
+
+  if (_equals(vm->flags) || _above(vm->flags))
+    vm->pc = addr;
+}
+
+HandleDecl(_inst_JUMPNEA_handle) {
+  Word addr;
+
+  addr = _prog_fetch(vm);  
+
+  if (!vm->flags.running)
+    return;
+
+  if (!(_equals(vm->flags) || _above(vm->flags)))
     vm->pc = addr;
 }
 
 /* Register Incr & Decr */
 
+#define _integer_operation(r_type, o_type, flags, optr, opnd_1, opnd_2) \
+  ({ \
+    r_type r_opnd_1, r_opnd_2, r_res; \
+    o_type o_opnd_1, o_opnd_2, o_res; \
+    r_opnd_1 = opnd_1; \
+    r_opnd_2 = opnd_2; \
+    o_opnd_1 = r_opnd_1; \
+    o_opnd_2 = r_opnd_2; \
+    o_res = o_opnd_1 optr o_opnd_2; \
+    r_res = o_res & LOW_HALF; \
+    flags.zero = !(r_res); \
+    flags.carry = !!(o_res & HIGH_HALF); \
+    flags.sign = !!signbit(*((f32 *) &r_res)); \
+    flags.overflow = \
+      signbit(*((f32 *) &r_res)) != \
+      signbit(*((f32 *) &r_opnd_1)); \
+    r_res; \
+  })
+
+#define _unsigned_integer_operation(flags, optr, opnd_1, opnd_2) \
+  _integer_operation(u32, u64, flags, optr, opnd_1, opnd_2)
+
+#define _signed_integer_operation(flags, optr, opnd_1, opnd_2) \
+  _integer_operation(i32, i64, flags, optr, opnd_1, opnd_2)
+
 HandleDecl(_inst_INCRA_handle) {
-  Word u_src, u_res;
-  TwoW l_src, l_res;
-
-  /* Setting */
-
-  u_src = vm->ra;
-  l_src = u_src;
-
-  /* Operation */
-
-  l_res = l_src + 1U;
-  u_res = (Word) (l_res & TwoW_RHALF);
-
-  /* Flags */
-
-  vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
-  vm->flags.overflow = 
-    signbit (*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
-
-  /* Storing result */
-
-  vm->ra = u_res;
+  vm->ra = _unsigned_integer_operation(vm->flags, +, vm->ra, 1U);
 }
 
-HandleDecl(_inst_INCRB_handle) {
-  Word u_src, u_res;
-  TwoW l_src, l_res;
-
-  /* Setting */
-
-  u_src = vm->rb;
-  l_src = u_src;
-
-  /* Operation */
-
-  l_res = l_src + 1U;
-  u_res = (Word) (l_res & TwoW_RHALF);
-
-  /* Flags */
-
-  vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
-  vm->flags.overflow = 
-    signbit (*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
-
-  /* Storing result */
-
-  vm->rb = u_res;
+HandleDecl(_inst_INCRX_handle) {
+  vm->rx = _unsigned_integer_operation(vm->flags, +, vm->rx, 1U);
 }
 
-HandleDecl(_inst_INCRC_handle) {
-  Word u_src, u_res;
-  TwoW l_src, l_res;
-
-  /* Setting */
-
-  u_src = vm->rc;
-  l_src = u_src;
-
-  /* Operation */
-
-  l_res = l_src + 1U;
-  u_res = (Word) (l_res & TwoW_RHALF);
-
-  /* Flags */
-
-  vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
-  vm->flags.overflow = 
-    signbit (*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
-
-  /* Storing result */
-
-  vm->rc = u_res;
+HandleDecl(_inst_INCRY_handle) {
+  vm->ry = _unsigned_integer_operation(vm->flags, +, vm->ry, 1U);
 }
 
-HandleDecl(_inst_INCRD_handle) { 
-  Word u_src, u_res;
-  TwoW l_src, l_res;
-
-  /* Setting */
-
-  u_src = vm->rd;
-  l_src = u_src;
-
-  /* Operation */
-
-  l_res = l_src + 1U;
-  u_res = (Word) (l_res & TwoW_RHALF);
-
-  /* Flags */
-
-  vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
-  vm->flags.overflow = 
-    signbit (*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
-
-  /* Storing result */
-
-  vm->rd = u_res;
+HandleDecl(_inst_INCRZ_handle) { 
+  vm->rz = _unsigned_integer_operation(vm->flags, +, vm->rz, 1U);
 }
 
 HandleDecl(_inst_DECRA_handle) {
-  Word u_src, u_res;
-  TwoW l_src, l_res;
-
-  /* Setting */
-
-  u_src = vm->ra;
-  l_src = u_src;
-
-  /* Operation */
-
-  l_res = l_src - 1U;
-  u_res = (Word) (l_res & TwoW_RHALF);
-
-  /* Flags */
-
-  vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
-  vm->flags.overflow = 
-    signbit (*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
-
-  /* Storing result */
-
-  vm->ra = u_res;
+  vm->ra = _unsigned_integer_operation(vm->flags, -, vm->ra, 1U);
 }
 
-HandleDecl(_inst_DECRB_handle) {
-  Word u_src, u_res;
-  TwoW l_src, l_res;
-
-  /* Setting */
-
-  u_src = vm->rb;
-  l_src = u_src;
-
-  /* Operation */
-
-  l_res = l_src - 1U;
-  u_res = (Word) (l_res & TwoW_RHALF);
-
-  /* Flags */
-
-  vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
-  vm->flags.overflow = 
-    signbit (*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
-
-  /* Storing result */
-
-  vm->rb = u_res;
+HandleDecl(_inst_DECRX_handle) {
+  vm->rx = _unsigned_integer_operation(vm->flags, -, vm->rx, 1U);
 }
 
-HandleDecl(_inst_DECRC_handle) {
-  Word u_src, u_res;
-  TwoW l_src, l_res;
-
-  /* Setting */
-
-  u_src = vm->rc;
-  l_src = u_src;
-
-  /* Operation */
-
-  l_res = l_src - 1U;
-  u_res = (Word) (l_res & TwoW_RHALF);
-
-  /* Flags */
-
-  vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
-  vm->flags.overflow = 
-    signbit (*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
-
-  /* Storing result */
-
-  vm->rc = u_res;
+HandleDecl(_inst_DECRY_handle) {
+  vm->ry = _unsigned_integer_operation(vm->flags, -, vm->ry, 1U);
 }
 
-HandleDecl(_inst_DECRD_handle) {
-  Word u_src, u_res;
-  TwoW l_src, l_res;
-
-  /* Setting */
-
-  u_src = vm->rd;
-  l_src = u_src;
-
-  /* Operation */
-
-  l_res = l_src - 1U;
-  u_res = (Word) (l_res & TwoW_RHALF);
-
-  /* Flags */
-
-  vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
-  vm->flags.overflow = 
-    signbit (*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
-
-  /* Storing result */
-
-  vm->rd = u_res;
+HandleDecl(_inst_DECRZ_handle) { 
+  vm->rz = _unsigned_integer_operation(vm->flags, -, vm->rz, 1U);
 }
+
+/* Arithmetics */
+
+HandleDecl(_inst_USUM_handle) {
+  Word opnd_1, opnd_2, res;
+
+  opnd_1 = _stack_pop(vm);
+
+  if (!vm->flags.running) 
+    return;
+
+  opnd_2 = _stack_pop(vm);
+
+  if (!vm->flags.running) 
+    return;
+
+  res = opnd_1 + opnd_2;
+
+  _stack_push(vm, res);
+} 
+
+HandleDecl(_inst_USUB_handle) {
+  Word opnd_1, opnd_2, res;
+
+  opnd_1 = _stack_pop(vm);
+
+  if (!vm->flags.running) 
+    return;
+
+  opnd_2 = _stack_pop(vm);
+
+  if (!vm->flags.running) 
+    return;
+
+  res = opnd_1 - opnd_2;
+
+  _stack_push(vm, res);
+} 
 
 /* Logic */
 
-HandleDecl(_inst_COMP_handle) {
-  Word u_src1, u_src2, u_res;
-  TwoW l_src1, l_src2, l_res;
+HandleDecl(_inst_UCOMP_handle) {
+  u32 opnd_1, opnd_2;
 
   /* Setting */
 
-  u_src1 = _stack_pop(vm);
+  opnd_1 = _stack_pop(vm);
 
   if (!vm->flags.running)
     return;
 
-  u_src2 = _stack_pop(vm);
+  opnd_2 = _stack_pop(vm);
 
   if (!vm->flags.running)
     return;
 
-  l_src1 = u_src1;
-  l_src2 = u_src2;
+  _unsigned_integer_operation(vm->flags, -, opnd_1, opnd_2);
+}
 
-  /* Operation */
+HandleDecl(_inst_ICOMP_handle) {
+  /* TODO: Implement */
+}
 
-  l_res = l_src1 - l_src2;
-  u_res = (Word) (l_res & TwoW_RHALF);
-
-  /* Flags */
-
-  vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
-  vm->flags.overflow = 
-    signbit(*((Flot *) &u_res)) != signbit(*((Flot *) &u_src1));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
-
-  /* No result */
+HandleDecl(_inst_FCOMP_handle) {
+  /* TODO: Implement */
 }
 
 HandleDecl(_inst_AND_handle) {
@@ -682,18 +504,15 @@ HandleDecl(_inst_AND_handle) {
 
   vm->flags.zero = !u_res;
   vm->flags.carry = FALSE;
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
+  vm->flags.sign = !!signbit(*((f32 *) &u_res));
   vm->flags.overflow = 
-    signbit(*((Flot *) &u_res)) != signbit(*((Flot *) &u_src1));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
+    signbit(*((f32 *) &u_res)) != signbit(*((f32 *) &u_src1));
+  vm->flags.nan = !!isnan(*((f32 *) &u_res));
+  vm->flags.infinity = !!isinf(*((f32 *) &u_res));
 
   /* Storing result */
 
   _stack_push(vm, u_res);
-
-  if (!vm->flags.running)
-    return;
 }
 
 HandleDecl(_inst_TEST_handle) {
@@ -719,11 +538,11 @@ HandleDecl(_inst_TEST_handle) {
 
   vm->flags.zero = !u_res;
   vm->flags.carry = FALSE;
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
+  vm->flags.sign = !!signbit(*((f32 *) &u_res));
   vm->flags.overflow = 
-    signbit(*((Flot *) &u_res)) != signbit(*((Flot *) &u_src1));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
+    signbit(*((f32 *) &u_res)) != signbit(*((f32 *) &u_src1));
+  vm->flags.nan = !!isnan(*((f32 *) &u_res));
+  vm->flags.infinity = !!isinf(*((f32 *) &u_res));
 
   /* No result */
 }
@@ -751,18 +570,16 @@ HandleDecl(_inst_XOR_handle) {
 
   vm->flags.zero = !u_res;
   vm->flags.carry = FALSE;
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
+  vm->flags.sign = !!signbit(*((f32 *) &u_res));
   vm->flags.overflow = 
-    signbit(*((Flot *) &u_res)) != signbit(*((Flot *) &u_src1));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
+    signbit(*((f32 *) &u_res)) != signbit(*((f32 *) &u_src1));
+  vm->flags.nan = !!isnan(*((f32 *) &u_res));
+  vm->flags.infinity = !!isinf(*((f32 *) &u_res));
 
   /* Storing result */
 
   _stack_push(vm, u_res);
 
-  if (!vm->flags.running)
-    return;
 }
 
 HandleDecl(_inst_OR_handle) {
@@ -788,18 +605,15 @@ HandleDecl(_inst_OR_handle) {
 
   vm->flags.zero = !u_res;
   vm->flags.carry = FALSE;
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
+  vm->flags.sign = !!signbit(*((f32 *) &u_res));
   vm->flags.overflow = 
-    signbit(*((Flot *) &u_res)) != signbit(*((Flot *) &u_src1));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
+    signbit(*((f32 *) &u_res)) != signbit(*((f32 *) &u_src1));
+  vm->flags.nan = !!isnan(*((f32 *) &u_res));
+  vm->flags.infinity = !!isinf(*((f32 *) &u_res));
 
   /* Storing result */
 
   _stack_push(vm, u_res);
-
-  if (!vm->flags.running)
-    return;
 }
 
 HandleDecl(_inst_NOT_handle) {
@@ -820,25 +634,22 @@ HandleDecl(_inst_NOT_handle) {
 
   vm->flags.zero = !u_res;
   vm->flags.carry = FALSE;
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
+  vm->flags.sign = !!signbit(*((f32 *) &u_res));
   vm->flags.overflow = 
-    signbit(*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
+    signbit(*((f32 *) &u_res)) != signbit(*((f32 *) &u_src));
+  vm->flags.nan = !!isnan(*((f32 *) &u_res));
+  vm->flags.infinity = !!isinf(*((f32 *) &u_res));
 
   /* Storing result */
 
   _stack_push(vm, u_res);
-
-  if (!vm->flags.running)
-    return;
 }
 
 /* Bit Shifting */
 
 HandleDecl(_inst_SHL_handle) {
   Word u_src, u_res;
-  TwoW l_src, l_res;
+  DWord l_src, l_res;
 
   /* Setting */
 
@@ -852,29 +663,26 @@ HandleDecl(_inst_SHL_handle) {
   /* Operation */
 
   l_res = l_src << 1;
-  u_res = (Word) (l_res & TwoW_RHALF);
+  u_res = (Word) (l_res & LOW_HALF);
   
   /* Flags */
 
   vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
+  vm->flags.carry = !!(l_res & HIGH_HALF);
+  vm->flags.sign = !!signbit(*((f32 *) &u_res));
   vm->flags.overflow = 
-    signbit(*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
+    signbit(*((f32 *) &u_res)) != signbit(*((f32 *) &u_src));
+  vm->flags.nan = !!isnan(*((f32 *) &u_res));
+  vm->flags.infinity = !!isinf(*((f32 *) &u_res));
 
   /* Storing result */
 
   _stack_push(vm, u_res);
-
-  if (!vm->flags.running)
-    return;
 }
 
 HandleDecl(_inst_SHR_handle) {
   Word u_src, u_res;
-  TwoW l_src, l_res;
+  DWord l_src, l_res;
 
   /* Setting */
 
@@ -883,34 +691,31 @@ HandleDecl(_inst_SHR_handle) {
   if (!vm->flags.running) 
     return;
 
-  l_src = ((TwoW) u_src) << (Word_SIZE * 8);
+  l_src = ((DWord) u_src) << (sizeof(Word) * 8);
 
   /* Operation */
 
   l_res = l_src >> 1;
-  u_res = (Word) (l_res >> (Word_SIZE * 8));
+  u_res = (Word) (l_res >> (sizeof(Word) * 8));
   
   /* Flags */
 
   vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_RHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
+  vm->flags.carry = !!(l_res & LOW_HALF);
+  vm->flags.sign = !!signbit(*((f32 *) &u_res));
   vm->flags.overflow = 
-    signbit(*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
+    signbit(*((f32 *) &u_res)) != signbit(*((f32 *) &u_src));
+  vm->flags.nan = !!isnan(*((f32 *) &u_res));
+  vm->flags.infinity = !!isinf(*((f32 *) &u_res));
 
   /* Storing result */
 
   _stack_push(vm, u_res);
-
-  if (!vm->flags.running)
-    return;
 }
 
 HandleDecl(_inst_RTL_handle) {
   Word u_src, u_res;
-  TwoW l_src, l_res;
+  DWord l_src, l_res;
 
   /* Setting */
 
@@ -923,30 +728,27 @@ HandleDecl(_inst_RTL_handle) {
 
   /* Operation */
 
-  l_res = (l_src << 1) | (l_src >> ((Word_SIZE * 8) - 1));
-  u_res = (Word) (l_res & TwoW_RHALF);
+  l_res = (l_src << 1) | (l_src >> ((sizeof(Word) * 8) - 1));
+  u_res = (Word) (l_res & LOW_HALF);
   
   /* Flags */
 
   vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_LHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
+  vm->flags.carry = !!(l_res & HIGH_HALF);
+  vm->flags.sign = !!signbit(*((f32 *) &u_res));
   vm->flags.overflow = 
-    signbit(*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
+    signbit(*((f32 *) &u_res)) != signbit(*((f32 *) &u_src));
+  vm->flags.nan = !!isnan(*((f32 *) &u_res));
+  vm->flags.infinity = !!isinf(*((f32 *) &u_res));
 
   /* Storing result */
 
   _stack_push(vm, u_res);
-
-  if (!vm->flags.running)
-    return;
 }
 
 HandleDecl(_inst_RTR_handle) {
   Word u_src, u_res;
-  TwoW l_src, l_res;
+  DWord l_src, l_res;
 
   /* Setting */
 
@@ -955,29 +757,26 @@ HandleDecl(_inst_RTR_handle) {
   if (!vm->flags.running) 
     return;
 
-  l_src = ((TwoW) u_src) << (Word_SIZE * 8);
+  l_src = ((DWord) u_src) << (sizeof(Word) * 8);
 
   /* Operation */
 
-  l_res = (l_src >> 1) | (l_src << ((Word_SIZE * 8) - 1));
-  u_res = (Word) (l_res >> (Word_SIZE * 8));
+  l_res = (l_src >> 1) | (l_src << ((sizeof(Word) * 8) - 1));
+  u_res = (Word) (l_res >> (sizeof(Word) * 8));
   
   /* Flags */
 
   vm->flags.zero = !u_res;
-  vm->flags.carry = !!(l_res & TwoW_RHALF);
-  vm->flags.sign = !!signbit(*((Flot *) &u_res));
+  vm->flags.carry = !!(l_res & LOW_HALF);
+  vm->flags.sign = !!signbit(*((f32 *) &u_res));
   vm->flags.overflow = 
-    signbit(*((Flot *) &u_res)) != signbit(*((Flot *) &u_src));
-  vm->flags.nan = !!isnan(*((Flot *) &u_res));
-  vm->flags.infinity = !!isinf(*((Flot *) &u_res));
+    signbit(*((f32 *) &u_res)) != signbit(*((f32 *) &u_src));
+  vm->flags.nan = !!isnan(*((f32 *) &u_res));
+  vm->flags.infinity = !!isinf(*((f32 *) &u_res));
 
   /* Storing result */
 
   _stack_push(vm, u_res);
-
-  if (!vm->flags.running)
-    return;
 }
 
 /* CAPI Interrupt */
@@ -1006,72 +805,63 @@ Handle _inst_handle_table[_INST_LEN] = {
   _inst_PUSH_handle,
   _inst_DUPL_handle,
   _inst_PUSHA_handle,
-  _inst_PUSHB_handle,
-  _inst_PUSHC_handle,
-  _inst_PUSHD_handle,
+  _inst_PUSHX_handle,
+  _inst_PUSHY_handle,
+  _inst_PUSHX_handle,
   _inst_PUSHP_handle,
   _inst_PUSHS_handle,
-  _inst_PUSHF_handle,
+  _inst_PUSHB_handle,
+  _inst_PUSHL_handle,
 
   /* Stack Popping */
 
   _inst_POP_handle,
   _inst_POPA_handle,
-  _inst_POPB_handle,
-  _inst_POPC_handle,
-  _inst_POPD_handle,
+  _inst_POPX_handle,
+  _inst_POPY_handle,
+  _inst_POPZ_handle,
   _inst_POPP_handle,
   _inst_POPS_handle,
-  _inst_POPF_handle,
-
-  /* Register Loading */
-
-  _inst_LOADA_handle,
-  _inst_LOADB_handle,
-  _inst_LOADC_handle,
-  _inst_LOADD_handle,
-
-  /* Register Moving */
-
-  _inst_MOVAB_handle,
-  _inst_MOVAC_handle,
-  _inst_MOVAD_handle,
-  _inst_MOVBA_handle,
-  _inst_MOVBC_handle,
-  _inst_MOVBD_handle,
-  _inst_MOVCA_handle,
-  _inst_MOVCB_handle,
-  _inst_MOVCD_handle,
-  _inst_MOVDA_handle,
-  _inst_MOVDB_handle,
-  _inst_MOVDC_handle,
+  _inst_POPB_handle,
+  _inst_POPL_handle,
 
   /* Branching */
 
   _inst_JUMP_handle, 
   _inst_JUMPZ_handle, 
-  _inst_JUMPNZ_handle,  
-  _inst_JUMPC_handle, 
-  _inst_JUMPNC_handle,  
-  _inst_JUMPS_handle, 
-  _inst_JUMPNS_handle,  
-  _inst_JUMPO_handle, 
-  _inst_JUMPNO_handle, 
+  _inst_JUMPNZ_handle, 
+  _inst_JUMPE_handle,
+  _inst_JUMPNE_handle,
+  _inst_JUMPB_handle,
+  _inst_JUMPNB_handle,
+  _inst_JUMPA_handle,
+  _inst_JUMPNA_handle,
+  _inst_JUMPEB_handle,
+  _inst_JUMPNEB_handle,
+  _inst_JUMPEA_handle,
+  _inst_JUMPNEA_handle,
   
   /* Register Incr & Decr */
 
   _inst_INCRA_handle,
-  _inst_INCRB_handle,
-  _inst_INCRC_handle,
-  _inst_INCRD_handle,
+  _inst_INCRX_handle,
+  _inst_INCRY_handle,
+  _inst_INCRZ_handle,
   _inst_DECRA_handle,
-  _inst_DECRB_handle,
-  _inst_DECRC_handle,
-  _inst_DECRD_handle,
+  _inst_DECRX_handle,
+  _inst_DECRY_handle,
+  _inst_DECRZ_handle,
+
+  /* Arithmetics */
+
+  _inst_USUM_handle,
+  _inst_USUB_handle,
 
   /* Logic */
 
-  _inst_COMP_handle, 
+  _inst_UCOMP_handle, 
+  _inst_ICOMP_handle, 
+  _inst_FCOMP_handle, 
   _inst_AND_handle, 
   _inst_TEST_handle, 
   _inst_XOR_handle, 
@@ -1179,201 +969,3 @@ Handle _inst_handle_table[_INST_LEN] = {
 
 //   return TRUE;
 // }
-
-/* Arithmetics */
-
-// Bool _arith_handle(CoalVM * vm) {
-//   Any first, second, result;
-
-//   first.u = vm->ra;
-//   second.u = vm->rb;
-
-//   switch (vm->inst) {
-//     case INST_BMUL:   
-//       result.u = ((u32) first.b) * ((u32) second.b);
-//       break;
-//     case INST_BDIV:  
-//       result.u = ((u32) first.b) / ((u32) second.b); 
-//       break;
-//     case INST_BSUM:  
-//       result.u = ((u32) first.b) + ((u32) second.b); 
-//       break;
-//     case INST_BSUB: 
-//       result.u = ((u32) first.b) - ((u32) second.b); 
-//       break;
-    
-//     case INST_CMUL:  
-//       result.i = ((i32) first.c) * ((i32) second.c);
-//       break;
-//     case INST_CDIV:  
-//       result.i = ((i32) first.c) / ((i32) second.c); 
-//       break;
-//     case INST_CSUM:  
-//       result.i = ((i32) first.c) + ((i32) second.c); 
-//       break;
-//     case INST_CSUB:  
-//       result.i = ((i32) first.c) - ((i32) second.c); 
-//       break;
-    
-//     case INST_UMUL:  
-//       result.l = ((u64) first.u) * ((u64) second.u);
-//       break;
-//     case INST_UDIV:  
-//       result.l = ((u64) first.u) / ((u64) second.u); 
-//       break;
-//     case INST_USUM:  
-//       result.l = ((u64) first.u) + ((u64) second.u); 
-//       break;
-//     case INST_USUB:  
-//       result.l = ((u64) first.u) - ((u64) second.u); 
-//       break;
-    
-//     case INST_IMUL:  
-//       result.s = ((i64) first.i) * ((i64) second.i);
-//       break;
-//     case INST_IDIV:  
-//       result.s = ((i64) first.i) / ((i64) second.i); 
-//       break;
-//     case INST_ISUM:  
-//       result.s = ((i64) first.i) + ((i64) second.i); 
-//       break;
-//     case INST_ISUB:  
-//       result.s = ((i64) first.i) - ((i64) second.i); 
-//       break;
-    
-//     case INST_FMUL: 
-//       result.f = first.f * second.f; 
-//       break;
-//     case INST_FDIV:  
-//       result.f = first.f / second.f; 
-//       break;
-//     case INST_FSUM:  
-//       result.f = first.f + second.f; 
-//       break;
-//     case INST_FSUB:  
-//       result.f = first.f - second.f; 
-//       break;
-    
-//     default:
-//       return FALSE;
-//   }
-
-//   /* Carry & Zero Check */
-
-//   switch (vm->inst) {
-//     case INST_BMUL: case INST_BDIV:
-//     case INST_BSUM: case INST_BSUB:
-//       if (result.u & ~((u32) 0xFFU))
-//         _flags_include(vm, FLAG_CARRY);
-//       else
-//         _flags_exclude(vm, FLAG_CARRY);
-
-//       result.b = result.u;
-
-//       if (result.b == 0) _flags_include(vm, FLAG_ZERO);
-//       else _flags_exclude(vm, FLAG_ZERO);
-
-//       break;
-
-//     case INST_CMUL: case INST_CDIV:  
-//     case INST_CSUM: case INST_CSUB:  
-//       if (result.u & ~((u32) 0x800000FFU))
-//         _flags_include(vm, FLAG_CARRY);
-//       else 
-//         _flags_exclude(vm, FLAG_CARRY);
-
-//       result.c = result.i;
-
-//       if (result.c == 0) _flags_include(vm, FLAG_ZERO);
-//       else _flags_exclude(vm, FLAG_ZERO);
-
-//       break;
-    
-//     case INST_UMUL: case INST_UDIV:  
-//     case INST_USUM: case INST_USUB:
-//       if (result.l & ~((u64) 0xFFFFFFFFU)) 
-//         _flags_include(vm, FLAG_CARRY);
-//       else 
-//         _flags_exclude(vm, FLAG_CARRY);
-
-//       result.u = result.l;
-
-//       if (result.u == 0) _flags_include(vm, FLAG_ZERO);
-//       else _flags_exclude(vm, FLAG_ZERO);
-
-//       break;
-    
-//     case INST_IMUL: case INST_IDIV:  
-//     case INST_ISUM: case INST_ISUB:  
-//       if (result.l & ~((u64) 0x80000000FFFFFFFFU)) 
-//         _flags_include(vm, FLAG_CARRY);
-//       else 
-//         _flags_exclude(vm, FLAG_CARRY);
-
-//       result.i = result.s;
-
-//       if (result.i == 0) _flags_include(vm, FLAG_ZERO);
-//       else _flags_exclude(vm, FLAG_ZERO);
-
-//       break;
-    
-//     case INST_FMUL: case INST_FDIV:  
-//     case INST_FSUM: case INST_FSUB:  
-//       _flags_exclude(vm, FLAG_CARRY);
-
-//       if (result.f == 0.0) _flags_include(vm, FLAG_ZERO);
-//       else _flags_exclude(vm, FLAG_ZERO);
-
-//       break;
-//   }
-
-//   /* Sign, Overflow, NAN & INF Check */
-
-//   switch (vm->inst) {
-//     case INST_BMUL: case INST_BDIV:
-//     case INST_BSUM: case INST_BSUB:
-//     case INST_CMUL: case INST_CDIV:  
-//     case INST_CSUM: case INST_CSUB: 
-
-//       if (result.b & 0x8U) _flags_include(vm, FLAG_SIGN);
-//       else _flags_exclude(vm, FLAG_SIGN);
-
-//       if ((result.b & 0x8U) != (first.b & 0x8U))
-//         _flags_include(vm, FLAG_OVERFLOW);
-//       else 
-//         _flags_exclude(vm, FLAG_OVERFLOW);
-
-//       _flags_exclude(vm, FLAG_NAN);
-//       _flags_exclude(vm, FLAG_INFINITY);
-
-//       break;
-    
-//     case INST_UMUL: case INST_UDIV:  
-//     case INST_USUM: case INST_USUB:
-//     case INST_IMUL: case INST_IDIV:  
-//     case INST_ISUM: case INST_ISUB:  
-//     case INST_FMUL: case INST_FDIV:  
-//     case INST_FSUM: case INST_FSUB:
-      
-//       if (signbit(result.f)) _flags_include(vm, FLAG_SIGN);
-//       else _flags_exclude(vm, FLAG_SIGN);
-
-//       if (signbit(result.f) != signbit(first.f))
-//         _flags_include(vm, FLAG_OVERFLOW);
-//       else 
-//         _flags_exclude(vm, FLAG_OVERFLOW);
-
-//       if (isnan(result.f)) _flags_include(vm, FLAG_NAN);
-//       else _flags_exclude(vm, FLAG_NAN);
-
-//       if (isinf(result.f)) _flags_include(vm, FLAG_INFINITY);
-//       else _flags_exclude(vm, FLAG_INFINITY);
-
-//       break;
-//   }
-
-//   vm->ra = result.u;
-
-//   return TRUE;
-// }
-
