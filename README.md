@@ -1,6 +1,5 @@
-# 💎 Coal
-Another mineral themed, experimental language. 
-We hope this is the good one ✨.
+# :gem: Coal
+Another mineral themed language. We hope this is the good one :sparkles:.
 
-## 🚧 Under Construction
-Please, bear ***(🐻)*** with us for a bit. This will ***soon*** be filled with useful info.
+## :construction: Site Under Construction
+Please, bear (:bear:) with us for a bit (:technologist:). This will :v: soon :v: be filled with useful info.
